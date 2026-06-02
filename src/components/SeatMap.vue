@@ -30,7 +30,13 @@ function showTip(e: MouseEvent, seat: string) {
     return
   }
   const name = store.nameFor(seat)
-  tip.value = { seat, name: name ? displayName(name) : 'Ledig', x: e.clientX, y: e.clientY }
+  const isVacated = store.isChanged(seat) && !name
+  tip.value = {
+    seat,
+    name: name ? displayName(name) : isVacated ? 'Frigitt' : 'Ledig',
+    x: e.clientX,
+    y: e.clientY,
+  }
 }
 function moveTip(e: MouseEvent) {
   if (tip.value) {
@@ -58,13 +64,20 @@ function onDragStart(seat: string, e: DragEvent) {
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
 }
 function onDragEnter(seat: string) {
-  if (dragging.value && dragging.value !== seat && store.availableSeats.has(seat)) {
+  if (dragging.value !== seat && store.availableSeats.has(seat)) {
     dragOver.value = seat
   }
 }
-function onDrop(seat: string) {
+function onDrop(seat: string, e: DragEvent) {
   const from = dragging.value
-  if (from && from !== seat && store.availableSeats.has(seat)) store.moveSeat(from, seat)
+  if (from && from !== seat && store.availableSeats.has(seat)) {
+    store.moveSeat(from, seat)
+  } else if (!from) {
+    const data = e.dataTransfer?.getData('text/plain') ?? ''
+    if (data.startsWith('holding:') && store.availableSeats.has(seat)) {
+      store.holdingToSeat(data.slice(8), seat)
+    }
+  }
   dragging.value = null
   dragOver.value = null
 }
@@ -75,7 +88,7 @@ function onDragEnd() {
 </script>
 
 <template>
-  <div class="cabin">
+  <div class="cabin" :class="{ 'drag-active': !!dragging }">
     <div class="fuselage">
       <div class="nose">
         <span class="model">A20N</span>
@@ -110,7 +123,8 @@ function onDragEnd() {
               :class="{
                 occupied: !!store.nameFor(seatId(row, c)),
                 unavailable: !store.availableSeats.has(seatId(row, c)),
-                changed: store.availableSeats.has(seatId(row, c)) && store.isChanged(seatId(row, c)),
+                vacated: store.availableSeats.has(seatId(row, c)) && store.isChanged(seatId(row, c)) && !store.nameFor(seatId(row, c)),
+                changed: store.availableSeats.has(seatId(row, c)) && store.isChanged(seatId(row, c)) && !!store.nameFor(seatId(row, c)),
                 dragging: dragging === seatId(row, c),
                 dragover: dragOver === seatId(row, c),
               }"
@@ -123,7 +137,7 @@ function onDragEnd() {
               @dragstart="onDragStart(seatId(row, c), $event)"
               @dragenter.prevent="onDragEnter(seatId(row, c))"
               @dragover.prevent
-              @drop.prevent="onDrop(seatId(row, c))"
+              @drop.prevent="onDrop(seatId(row, c), $event)"
               @dragend="onDragEnd"
             >
               {{ store.availableSeats.has(seatId(row, c)) ? c : '✕' }}
@@ -231,12 +245,13 @@ function onDragEnd() {
   width: 2rem;
   height: 2rem;
   border-radius: 6px 6px 8px 8px;
-  border: 1px solid #cbd5e1;
-  background: #e2e8f0;
-  color: #94a3b8;
+  border: 1px solid #94a3b8;
+  background: #fff;
+  color: #475569;
   font-size: 0.7rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.05s ease, background 0.1s ease;
+  transition: transform 0.05s ease, background 0.1s ease, box-shadow 0.1s ease;
 }
 .seat:hover {
   transform: translateY(-1px);
@@ -253,6 +268,12 @@ function onDragEnd() {
   background: #fbbf24;
   border-color: #d97706;
   color: #7c2d12;
+}
+.seat.vacated {
+  background: #ffedd5;
+  border-color: #ea580c;
+  border-style: dashed;
+  color: #c2410c;
 }
 .seat.dragging {
   opacity: 0.4;
@@ -273,6 +294,20 @@ function onDragEnd() {
   outline: 2px dashed #f59e0b;
   outline-offset: 1px;
   border-color: #f59e0b;
+}
+/* When a drag is in progress, empty available seats glow green as valid drop targets */
+.drag-active .seat:not(.occupied):not(.unavailable):not(.dragging) {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #15803d;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+}
+.drag-active .seat:not(.occupied):not(.unavailable):not(.dragging):hover,
+.drag-active .seat.dragover {
+  background: #bbf7d0;
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.35);
+  outline: none;
 }
 .tail {
   height: 1rem;

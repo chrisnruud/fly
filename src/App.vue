@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useSeatStore } from './store'
 import SeatMap from './components/SeatMap.vue'
 import SeatPopup from './components/SeatPopup.vue'
+import HoldingArea from './components/HoldingArea.vue'
 import { displayName } from './format'
 
 const store = useSeatStore()
@@ -106,6 +107,8 @@ async function onFileChosen(e: Event) {
       </transition>
     </div>
 
+    <HoldingArea />
+
     <main class="layout">
       <div class="plane-col">
         <SeatMap @select="selectSeat" />
@@ -123,6 +126,15 @@ async function onFileChosen(e: Event) {
               </tr>
             </thead>
             <tbody>
+              <tr
+                v-for="name in store.currentHolding"
+                :key="`holding-${name}`"
+                class="holding-row"
+              >
+                <td class="seat-id">⏸</td>
+                <td>{{ displayName(name) }}</td>
+                <td class="original-cell">— venter —</td>
+              </tr>
               <tr
                 v-for="row in store.seatRows"
                 :key="row.seat"
@@ -147,7 +159,8 @@ async function onFileChosen(e: Event) {
     <footer>
       <span class="legend"><i class="dot empty"></i> Ledig</span>
       <span class="legend"><i class="dot occ"></i> Opptatt</span>
-      <span class="legend"><i class="dot chg"></i> Endret</span>
+      <span class="legend"><i class="dot chg"></i> Byttet</span>
+      <span class="legend"><i class="dot vac"></i> Frigitt</span>
       <span class="hint">Klikk et sete for å redigere · dra et opptatt sete for å flytte/bytte.</span>
     </footer>
   </div>
@@ -277,6 +290,21 @@ h1 {
 .table-panel tbody tr:hover {
   background: #f8fafc;
 }
+.table-panel tbody tr.holding-row {
+  background: #fffbeb;
+  cursor: default;
+}
+.table-panel tbody tr.holding-row:hover {
+  background: #fef3c7;
+}
+.table-panel tbody tr.holding-row .seat-id {
+  color: #d97706;
+}
+.table-panel tbody tr.holding-row .original-cell {
+  color: #d97706;
+  font-style: italic;
+  text-decoration: none;
+}
 .table-panel tbody tr.changed {
   background: #fef3c7;
 }
@@ -330,14 +358,18 @@ footer {
   display: inline-block;
 }
 .dot.empty {
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
+  background: #fff;
+  border: 1px solid #94a3b8;
 }
 .dot.occ {
   background: #2563eb;
 }
 .dot.chg {
   background: #fbbf24;
+}
+.dot.vac {
+  background: #ffedd5;
+  border: 1px dashed #ea580c;
 }
 .hint {
   margin-left: auto;

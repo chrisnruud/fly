@@ -52,10 +52,14 @@ export const useSeatStore = defineStore('seats', {
   state: () => ({
     flight: 'outbound' as FlightId,
     assignments: loadInitial(),
+    holding: { outbound: [] as string[], return: [] as string[] },
     dirty: false,
   }),
   getters: {
     flights: () => FLIGHTS,
+    currentHolding(state): string[] {
+      return state.holding[state.flight]
+    },
     current(state): Record<string, string> {
       return state.assignments[state.flight]
     },
@@ -144,8 +148,26 @@ export const useSeatStore = defineStore('seats', {
       }
       this.dirty = true
     },
+    seatToHolding(seat: string) {
+      const name = this.assignments[this.flight][seat]
+      if (!name) return
+      this.holding[this.flight].push(name)
+      delete this.assignments[this.flight][seat]
+      this.dirty = true
+    },
+    holdingToSeat(name: string, toSeat: string) {
+      if (!this.isAvailable(toSeat)) return
+      const idx = this.holding[this.flight].indexOf(name)
+      if (idx === -1) return
+      this.holding[this.flight].splice(idx, 1)
+      const displaced = this.assignments[this.flight][toSeat]
+      this.assignments[this.flight][toSeat] = name
+      if (displaced) this.holding[this.flight].push(displaced)
+      this.dirty = true
+    },
     resetToDefault() {
       this.assignments = clone(DEFAULT_ASSIGNMENTS)
+      this.holding = { outbound: [], return: [] }
       this.dirty = true
     },
     saveToSession() {

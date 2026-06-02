@@ -10,37 +10,45 @@ const emit = defineEmits<{ close: [] }>()
 const store = useSeatStore()
 
 const raw = computed(() => store.nameFor(props.seat))
-const nameInput = ref(raw.value)
 const moveTarget = ref('')
-
-const nameChanged = computed(() => nameInput.value.trim() !== raw.value)
 
 watch(
   () => props.seat,
   () => {
-    nameInput.value = store.nameFor(props.seat)
     moveTarget.value = ''
   },
 )
 
-const allSeats = computed(() => {
+const occupiedSeats = computed(() => {
   const seats: string[] = []
   for (const row of ROWS)
     for (const col of COLUMNS) {
       const id = `${String(row).padStart(2, '0')}${col}`
-      if (store.availableSeats.has(id)) seats.push(id)
+      if (store.availableSeats.has(id) && store.nameFor(id)) seats.push(id)
     }
   return seats
 })
 
-function save() {
-  store.assignSeat(props.seat, nameInput.value)
+const hasOptions = computed(
+  () => occupiedSeats.value.some((s) => s !== props.seat) || store.currentHolding.length > 0,
+)
+
+function sendToHolding() {
+  store.seatToHolding(props.seat)
   emit('close')
 }
 
 function move() {
   if (!moveTarget.value) return
-  store.moveSeat(props.seat, moveTarget.value)
+  if (moveTarget.value.startsWith('holding:')) {
+    store.holdingToSeat(moveTarget.value.slice(8), props.seat)
+  } else if (raw.value) {
+    // occupied → swap with selected seat
+    store.moveSeat(props.seat, moveTarget.value)
+  } else {
+    // empty → pull the selected person into this seat
+    store.moveSeat(moveTarget.value, props.seat)
+  }
   emit('close')
 }
 </script>
@@ -59,29 +67,31 @@ function move() {
       </p>
 
       <label>
-        Passasjer (ETTERNAVN/FORNAVN)
-        <input
-          v-model="nameInput"
-          type="text"
-          placeholder="f.eks. HANSEN/OLE"
-          :disabled="!!moveTarget"
-          @keyup.enter="save"
-        />
-      </label>
-
-      <label>
-        Flytt / bytt til sete
-        <select v-model="moveTarget" :disabled="!raw || nameChanged">
-          <option value="">— velg sete —</option>
-          <option v-for="s in allSeats" :key="s" :value="s" :disabled="s === seat">
-            {{ s }}<template v-if="store.nameFor(s)"> ({{ displayName(store.nameFor(s)) }})</template>
-          </option>
+        {{ raw ? 'Bytt sete med' : 'Flytt hit fra' }}
+        <select v-model="moveTarget" :disabled="!hasOptions">
+          <option value="">— velg passasjer —</option>
+          <optgroup v-if="occupiedSeats.some((s) => s !== seat)" label="Bytt med sete">
+            <option v-for="s in occupiedSeats" :key="s" :value="s" :disabled="s === seat">
+              {{ s }} ({{ displayName(store.nameFor(s)) }})
+            </option>
+          </optgroup>
+          <optgroup v-if="store.currentHolding.length" label="Fra venteområde">
+            <option
+              v-for="name in store.currentHolding"
+              :key="name"
+              :value="`holding:${name}`"
+            >
+              {{ displayName(name) }} (venter)
+            </option>
+          </optgroup>
         </select>
       </label>
 
       <div class="actions">
-        <button class="primary" @click="save">Lagre</button>
-        <button :disabled="!moveTarget" @click="move">Flytt</button>
+        <button v-if="raw" class="hold" @click="sendToHolding">Legg i venteområde</button>
+        <button class="primary" :disabled="!moveTarget" @click="move">
+          {{ moveTarget.startsWith('holding:') ? 'Plasser her' : raw ? 'Bytt' : 'Flytt hit' }}
+        </button>
       </div>
     </div>
   </div>
@@ -167,6 +177,11 @@ select {
 .actions .primary {
   background: #2563eb;
   border-color: #2563eb;
+  color: #fff;
+}
+.actions .hold {
+  background: #f59e0b;
+  border-color: #f59e0b;
   color: #fff;
 }
 </style>
