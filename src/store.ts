@@ -52,6 +52,7 @@ export const useSeatStore = defineStore('seats', {
   state: () => ({
     flight: 'outbound' as FlightId,
     assignments: loadInitial(),
+    dirty: false,
   }),
   getters: {
     flights: () => FLIGHTS,
@@ -121,9 +122,11 @@ export const useSeatStore = defineStore('seats', {
       } else {
         delete this.assignments[this.flight][seat]
       }
+      this.dirty = true
     },
     clearSeat(seat: string) {
       delete this.assignments[this.flight][seat]
+      this.dirty = true
     },
     // Move a passenger to another seat; swaps if the target is taken.
     moveSeat(fromSeat: string, toSeat: string) {
@@ -139,15 +142,19 @@ export const useSeatStore = defineStore('seats', {
       } else {
         delete map[fromSeat]
       }
+      this.dirty = true
     },
     resetToDefault() {
       this.assignments = clone(DEFAULT_ASSIGNMENTS)
+      this.dirty = true
     },
     saveToSession() {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.assignments))
+      this.dirty = false
     },
     // Current assignments in seatassignments.txt format (for download).
     exportText(): string {
+      this.dirty = false
       return serializeAssignments(this.assignments)
     },
     // Replace current assignments from an uploaded txt file. Returns the number

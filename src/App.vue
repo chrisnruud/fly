@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSeatStore } from './store'
 import SeatMap from './components/SeatMap.vue'
 import SeatPopup from './components/SeatPopup.vue'
@@ -10,6 +10,13 @@ const store = useSeatStore()
 const selectedSeat = ref<string | null>(null)
 const savedNote = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (store.dirty) e.preventDefault()
+}
+
+onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
+onUnmounted(() => window.removeEventListener('beforeunload', onBeforeUnload))
 
 function selectSeat(seat: string) {
   selectedSeat.value = seat
