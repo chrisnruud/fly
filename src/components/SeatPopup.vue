@@ -36,12 +36,6 @@ function save() {
   emit('close')
 }
 
-function clear() {
-  store.clearSeat(props.seat)
-  nameInput.value = ''
-  emit('close')
-}
-
 function move() {
   if (!moveTarget.value) return
   store.moveSeat(props.seat, moveTarget.value)
@@ -85,7 +79,6 @@ function move() {
       <div class="actions">
         <button class="primary" @click="save">Lagre</button>
         <button :disabled="!moveTarget" @click="move">Flytt</button>
-        <button class="danger" :disabled="!raw" @click="clear">Fjern</button>
       </div>
     </div>
   </div>
@@ -172,10 +165,5 @@ select {
   background: #2563eb;
   border-color: #2563eb;
   color: #fff;
-}
-.actions .danger {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #b91c1c;
 }
 </style>
