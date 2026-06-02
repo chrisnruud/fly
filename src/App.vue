@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useSeatStore } from './store'
 import SeatMap from './components/SeatMap.vue'
 import SeatPopup from './components/SeatPopup.vue'
@@ -10,11 +10,36 @@ const store = useSeatStore()
 
 const selectedSeat = ref<string | null>(null)
 const selectedHolding = ref<string | null>(null)
+const hoveredSeat = ref<string | null>(null)
 const savedNote = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const tableScroll = ref<HTMLElement | null>(null)
+const seatRows = ref<Record<string, HTMLTableRowElement>>({})
+const searchQuery = ref('')
 const hasPassengersInHolding = computed(
   () => store.holding.outbound.length + store.holding.return.length > 0,
 )
+
+const filteredRows = computed(() => {
+  const query = searchQuery.value.toLowerCase().trim()
+  if (!query) return store.seatRows
+  
+  return store.seatRows.filter((row) => {
+    const seatMatch = row.seat.toLowerCase().includes(query)
+    const passengerMatch = row.current && displayName(row.current).toLowerCase().includes(query)
+    const originalMatch = row.original && displayName(row.original).toLowerCase().includes(query)
+    return seatMatch || passengerMatch || originalMatch
+  })
+})
+
+const filteredHolding = computed(() => {
+  const query = searchQuery.value.toLowerCase().trim()
+  if (!query) return store.currentHolding
+  
+  return store.currentHolding.filter((name) =>
+    displayName(name).toLowerCase().includes(query),
+  )
+})
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (store.dirty) e.preventDefault()
@@ -37,6 +62,35 @@ function closePopup() {
   selectedSeat.value = null
   selectedHolding.value = null
 }
+
+function setHoveredSeat(seat: string | null) {
+  hoveredSeat.value = seat
+}
+
+function setSeatRowRef(seat: string, el: unknown) {
+  if (el instanceof HTMLTableRowElement) {
+    seatRows.value[seat] = el
+    return
+  }
+  delete seatRows.value[seat]
+}
+
+function ensureHoveredRowVisible(seat: string | null) {
+  if (!seat) return
+  const row = seatRows.value[seat]
+  const container = tableScroll.value
+  if (!row || !container) return
+
+  const rowTop = row.offsetTop
+  const rowBottom = rowTop + row.offsetHeight
+  const viewTop = container.scrollTop
+  const viewBottom = viewTop + container.clientHeight
+  if (rowTop < viewTop || rowBottom > viewBottom) {
+    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
+
+watch(hoveredSeat, (seat) => ensureHoveredRowVisible(seat))
 
 function saveSession() {
   if (hasPassengersInHolding.value) {
@@ -144,12 +198,24 @@ async function onFileChosen(e: Event) {
 
     <main class="layout">
       <div class="plane-col">
-        <SeatMap @select="selectSeat" />
+        <SeatMap
+          :hovered-seat="hoveredSeat"
+          @select="selectSeat"
+          @hover="setHoveredSeat"
+        />
       </div>
 
       <section class="table-panel">
-        <h2>{{ store.flights.find((f) => f.id === store.flight)?.label }} — passasjerliste</h2>
-        <div class="table-scroll">
+        <div class="table-header">
+          <h2>{{ store.flights.find((f) => f.id === store.flight)?.label }} — passasjerliste</h2>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Søk passasjer eller sete..."
+            class="search-input"
+          />
+        </div>
+        <div ref="tableScroll" class="table-scroll">
           <table>
             <thead>
               <tr>
@@ -160,7 +226,7 @@ async function onFileChosen(e: Event) {
             </thead>
             <tbody>
               <tr
-                v-for="name in store.currentHolding"
+                v-for="name in filteredHolding"
                 :key="`holding-${name}`"
                 class="holding-row"
               >
@@ -169,10 +235,17 @@ async function onFileChosen(e: Event) {
                 <td class="original-cell">— venter —</td>
               </tr>
               <tr
-                v-for="row in store.seatRows"
+                v-for="row in filteredRows"
                 :key="row.seat"
-                :class="{ changed: row.changed, active: selectedSeat === row.seat }"
+                :ref="(el) => setSeatRowRef(row.seat, el)"
+                :class="{
+                  changed: row.changed,
+                  active: selectedSeat === row.seat,
+                  hovered: hoveredSeat === row.seat,
+                }"
                 @click="selectSeat(row.seat)"
+                @mouseenter="setHoveredSeat(row.seat)"
+                @mouseleave="setHoveredSeat(null)"
               >
                 <td class="seat-id">{{ row.seat }}</td>
                 <td>
@@ -313,6 +386,34 @@ h1 {
   margin: 0 0 0.6rem;
   font-size: 0.95rem;
 }
+.table-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+.table-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  flex: 1;
+  min-width: 0;
+}
+.search-input {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  width: 180px;
+  color: #334155;
+}
+.search-input::placeholder {
+  color: #cbd5e1;
+}
+.search-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
 .table-panel table {
   width: 100%;
   border-collapse: collapse;
@@ -361,6 +462,12 @@ h1 {
 .table-panel tbody tr.active {
   outline: 2px solid #2563eb;
   outline-offset: -2px;
+}
+.table-panel tbody tr.hovered {
+  background: #e0f2fe;
+}
+.table-panel tbody tr.changed.hovered {
+  background: #fde68a;
 }
 .table-panel .seat-id {
   font-weight: 700;

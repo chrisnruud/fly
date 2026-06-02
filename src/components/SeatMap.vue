@@ -13,7 +13,13 @@ import {
 } from '../layout'
 import { displayName } from '../format'
 
-const emit = defineEmits<{ select: [seat: string] }>()
+const props = defineProps<{
+  hoveredSeat?: string | null
+}>()
+const emit = defineEmits<{
+  select: [seat: string]
+  hover: [seat: string | null]
+}>()
 
 const store = useSeatStore()
 
@@ -51,6 +57,16 @@ function hideTip() {
 function onSeatClick(seat: string) {
   if (!store.availableSeats.has(seat)) return
   emit('select', seat)
+}
+
+function onSeatEnter(seat: string, e: MouseEvent) {
+  showTip(e, seat)
+  if (store.availableSeats.has(seat)) emit('hover', seat)
+}
+
+function onSeatLeave() {
+  hideTip()
+  emit('hover', null)
 }
 
 function onDragStart(seat: string, e: DragEvent) {
@@ -128,13 +144,14 @@ function onDragEnd() {
                 changed: store.availableSeats.has(seatId(row, c)) && store.isChanged(seatId(row, c)) && !!store.nameFor(seatId(row, c)),
                 dragging: dragging === seatId(row, c),
                 dragover: dragOver === seatId(row, c),
+                'linked-hover': props.hoveredSeat === seatId(row, c),
               }"
               :disabled="!store.availableSeats.has(seatId(row, c))"
               :draggable="!!store.nameFor(seatId(row, c))"
               @click="onSeatClick(seatId(row, c))"
-              @mouseenter="showTip($event, seatId(row, c))"
+              @mouseenter="onSeatEnter(seatId(row, c), $event)"
               @mousemove="moveTip"
-              @mouseleave="hideTip"
+              @mouseleave="onSeatLeave"
               @dragstart="onDragStart(seatId(row, c), $event)"
               @dragenter.prevent="onDragEnter(seatId(row, c))"
               @dragover.prevent
@@ -295,6 +312,11 @@ function onDragEnd() {
   outline: 2px dashed #f59e0b;
   outline-offset: 1px;
   border-color: #f59e0b;
+}
+.seat.linked-hover {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);
 }
 /* When a drag is in progress, empty available seats glow green as valid drop targets */
 .drag-active .seat:not(.occupied):not(.unavailable):not(.dragging) {
