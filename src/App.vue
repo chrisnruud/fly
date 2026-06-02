@@ -221,7 +221,7 @@ async function onFileChosen(e: Event) {
               <tr>
                 <th>Sete</th>
                 <th>Passasjer</th>
-                <th>Fra fil</th>
+                <th>Opprinnelig</th>
               </tr>
             </thead>
             <tbody>
