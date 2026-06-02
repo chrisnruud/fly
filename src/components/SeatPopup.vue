@@ -13,6 +13,8 @@ const raw = computed(() => store.nameFor(props.seat))
 const nameInput = ref(raw.value)
 const moveTarget = ref('')
 
+const nameChanged = computed(() => nameInput.value.trim() !== raw.value)
+
 watch(
   () => props.seat,
   () => {
@@ -62,13 +64,14 @@ function move() {
           v-model="nameInput"
           type="text"
           placeholder="f.eks. HANSEN/OLE"
+          :disabled="!!moveTarget"
           @keyup.enter="save"
         />
       </label>
 
       <label>
         Flytt / bytt til sete
-        <select v-model="moveTarget" :disabled="!raw">
+        <select v-model="moveTarget" :disabled="!raw || nameChanged">
           <option value="">— velg sete —</option>
           <option v-for="s in allSeats" :key="s" :value="s" :disabled="s === seat">
             {{ s }}<template v-if="store.nameFor(s)"> ({{ displayName(store.nameFor(s)) }})</template>
