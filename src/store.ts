@@ -37,10 +37,13 @@ function clone(a: ParsedAssignments): ParsedAssignments {
 
 function loadInitial(): ParsedAssignments {
   try {
-    const stored = sessionStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored) as ParsedAssignments
-      if (parsed && parsed.outbound && parsed.return) return parsed
+      if (parsed && parsed.outbound && parsed.return) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+        return parsed
+      }
     }
   } catch {
     // ignore corrupt storage and fall back to defaults
@@ -53,6 +56,7 @@ export const useSeatStore = defineStore('seats', {
     flight: 'outbound' as FlightId,
     assignments: loadInitial(),
     holding: { outbound: [] as string[], return: [] as string[] },
+    draggingFromHolding: false,
     dirty: false,
   }),
   getters: {
@@ -107,6 +111,9 @@ export const useSeatStore = defineStore('seats', {
   actions: {
     setFlight(flight: FlightId) {
       this.flight = flight
+    },
+    setDraggingFromHolding(value: boolean) {
+      this.draggingFromHolding = value
     },
     nameFor(seat: string): string {
       return this.assignments[this.flight][seat] ?? ''
@@ -168,14 +175,23 @@ export const useSeatStore = defineStore('seats', {
     resetToDefault() {
       this.assignments = clone(DEFAULT_ASSIGNMENTS)
       this.holding = { outbound: [], return: [] }
+      this.draggingFromHolding = false
       this.dirty = true
     },
-    saveToSession() {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.assignments))
+    saveToLocal() {
+      if (this.holding.outbound.length || this.holding.return.length) {
+        throw new Error('Kan ikke lagre før alle passasjerer er plassert (venteområdet må være tomt).')
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.assignments))
       this.dirty = false
     },
     // Current assignments in seatassignments.txt format (for download).
     exportText(): string {
+      if (this.holding.outbound.length || this.holding.return.length) {
+        throw new Error(
+          'Kan ikke laste ned før alle passasjerer er plassert (venteområdet må være tomt).',
+        )
+      }
       this.dirty = false
       return serializeAssignments(this.assignments)
     },

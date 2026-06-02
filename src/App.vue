@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useSeatStore } from './store'
 import SeatMap from './components/SeatMap.vue'
 import SeatPopup from './components/SeatPopup.vue'
@@ -9,8 +9,12 @@ import { displayName } from './format'
 const store = useSeatStore()
 
 const selectedSeat = ref<string | null>(null)
+const selectedHolding = ref<string | null>(null)
 const savedNote = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const hasPassengersInHolding = computed(
+  () => store.holding.outbound.length + store.holding.return.length > 0,
+)
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (store.dirty) e.preventDefault()
@@ -20,15 +24,26 @@ onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
 onUnmounted(() => window.removeEventListener('beforeunload', onBeforeUnload))
 
 function selectSeat(seat: string) {
+  selectedHolding.value = null
   selectedSeat.value = seat
+}
+
+function selectHolding(name: string) {
+  selectedSeat.value = null
+  selectedHolding.value = name
 }
 
 function closePopup() {
   selectedSeat.value = null
+  selectedHolding.value = null
 }
 
 function saveSession() {
-  store.saveToSession()
+  if (hasPassengersInHolding.value) {
+    alert('Kan ikke lagre før alle passasjerer er plassert (venteområdet må være tomt).')
+    return
+  }
+  store.saveToLocal()
   savedNote.value = true
   window.setTimeout(() => (savedNote.value = false), 2000)
 }
@@ -40,6 +55,10 @@ function reset() {
 }
 
 function exportFile() {
+  if (hasPassengersInHolding.value) {
+    alert('Kan ikke laste ned før alle passasjerer er plassert (venteområdet må være tomt).')
+    return
+  }
   const blob = new Blob([store.exportText()], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -62,8 +81,8 @@ async function onFileChosen(e: Event) {
   try {
     const text = await file.text()
     const count = store.importText(text)
-    store.saveToSession()
-    alert(`Lastet inn ${count} seteplasseringer og lagret til denne økten.`)
+    store.saveToLocal()
+    alert(`Lastet inn ${count} seteplasseringer og lagret lokalt.`)
   } catch (err) {
     alert((err as Error).message)
   }
@@ -92,8 +111,22 @@ async function onFileChosen(e: Event) {
       <span class="count">· {{ store.changeCount }} endret</span>
       <div class="spacer"></div>
       <button class="ghost" @click="triggerImport">Last opp .txt</button>
-      <button class="ghost" @click="exportFile">Last ned .txt</button>
-      <button class="save" @click="saveSession">Lagre til økt</button>
+      <button
+        class="ghost"
+        :disabled="hasPassengersInHolding"
+        :title="hasPassengersInHolding ? 'Plasser alle i sete før nedlasting' : ''"
+        @click="exportFile"
+      >
+        Last ned .txt
+      </button>
+      <button
+        class="save"
+        :disabled="hasPassengersInHolding"
+        :title="hasPassengersInHolding ? 'Plasser alle i sete før lagring' : ''"
+        @click="saveSession"
+      >
+        Lagre lokalt
+      </button>
       <button class="ghost" @click="reset">Tilbakestill</button>
       <input
         ref="fileInput"
@@ -107,7 +140,7 @@ async function onFileChosen(e: Event) {
       </transition>
     </div>
 
-    <HoldingArea />
+    <HoldingArea @select-holding="selectHolding" />
 
     <main class="layout">
       <div class="plane-col">
@@ -154,7 +187,12 @@ async function onFileChosen(e: Event) {
       </section>
     </main>
 
-    <SeatPopup v-if="selectedSeat" :seat="selectedSeat" @close="closePopup" />
+    <SeatPopup
+      v-if="selectedSeat || selectedHolding"
+      :seat="selectedSeat"
+      :holding-name="selectedHolding"
+      @close="closePopup"
+    />
 
     <footer>
       <span class="legend"><i class="dot empty"></i> Ledig</span>
@@ -230,9 +268,18 @@ h1 {
   border-color: #16a34a;
   color: #fff;
 }
+.toolbar .save:disabled {
+  background: #86efac;
+  border-color: #86efac;
+  cursor: not-allowed;
+}
 .toolbar .ghost {
   background: #fff;
   color: #475569;
+}
+.toolbar .ghost:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 .toolbar .ghost.active {
   background: #1e293b;
@@ -373,13 +420,5 @@ footer {
 }
 .hint {
   margin-left: auto;
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useSeatStore } from '../store'
 import { displayName } from '../format'
 
+const emit = defineEmits<{ selectHolding: [name: string] }>()
 const store = useSeatStore()
 
 const isDragOver = ref(false)
@@ -21,8 +22,17 @@ function onDragLeave() {
 function onDrop(e: DragEvent) {
   enterCount = 0
   isDragOver.value = false
+  store.setDraggingFromHolding(false)
   const data = e.dataTransfer?.getData('text/plain') ?? ''
   if (data && !data.startsWith('holding:')) store.seatToHolding(data)
+}
+function onChipDragStart(name: string, e: DragEvent) {
+  store.setDraggingFromHolding(true)
+  e.dataTransfer?.setData('text/plain', `holding:${name}`)
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+function onChipDragEnd() {
+  store.setDraggingFromHolding(false)
 }
 </script>
 
@@ -37,16 +47,19 @@ function onDrop(e: DragEvent) {
   >
     <span class="label">⏸ Venteområde</span>
     <template v-if="store.currentHolding.length">
-      <span
+      <button
         v-for="name in store.currentHolding"
         :key="name"
         class="chip"
+        type="button"
         :title="name"
         draggable="true"
-        @dragstart="(e) => { e.dataTransfer?.setData('text/plain', `holding:${name}`); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move' }"
+        @click="emit('selectHolding', name)"
+        @dragstart="onChipDragStart(name, $event)"
+        @dragend="onChipDragEnd"
       >
         {{ displayName(name) }}
-      </span>
+      </button>
     </template>
     <span v-else class="empty-hint">Slipp en passasjer hit for å parkere midlertidig</span>
   </div>
@@ -86,6 +99,7 @@ function onDrop(e: DragEvent) {
   padding: 0.2rem 0.7rem;
   font-weight: 600;
   white-space: nowrap;
+  border: 1px solid #f59e0b;
   cursor: grab;
 }
 .chip:active {

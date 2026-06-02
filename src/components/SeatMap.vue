@@ -78,6 +78,7 @@ function onDrop(seat: string, e: DragEvent) {
       store.holdingToSeat(data.slice(8), seat)
     }
   }
+  store.setDraggingFromHolding(false)
   dragging.value = null
   dragOver.value = null
 }
@@ -88,7 +89,7 @@ function onDragEnd() {
 </script>
 
 <template>
-  <div class="cabin" :class="{ 'drag-active': !!dragging }">
+  <div class="cabin" :class="{ 'drag-active': !!dragging || store.draggingFromHolding }">
     <div class="fuselage">
       <div class="nose">
         <span class="model">A20N</span>
