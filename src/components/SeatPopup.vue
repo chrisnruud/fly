@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useSeatStore } from '../store'
 import { ROWS, COLUMNS } from '../layout'
 import { displayName } from '../format'
@@ -48,6 +48,12 @@ function sendToHolding() {
   store.seatToHolding(seatId.value)
   emit('close')
 }
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape') emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
 function move() {
   if (!moveTarget.value) return

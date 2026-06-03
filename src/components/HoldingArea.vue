@@ -52,7 +52,7 @@ function onChipDragEnd() {
         :key="name"
         class="chip"
         type="button"
-        :title="name"
+        :title="displayName(name)"
         draggable="true"
         @click="emit('selectHolding', name)"
         @dragstart="onChipDragStart(name, $event)"

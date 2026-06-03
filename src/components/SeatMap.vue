@@ -15,6 +15,7 @@ import { displayName } from '../format'
 
 const props = defineProps<{
   hoveredSeat?: string | null
+  filteredSeats?: Set<string> | null
 }>()
 const emit = defineEmits<{
   select: [seat: string]
@@ -105,7 +106,7 @@ function onDragEnd() {
 </script>
 
 <template>
-  <div class="cabin" :class="{ 'drag-active': !!dragging || store.draggingFromHolding }">
+  <div class="cabin" :class="{ 'drag-active': !!dragging || store.draggingFromHolding, 'filter-active': !!props.filteredSeats }">
     <div class="fuselage">
       <div class="nose">
         <span class="model">A20N</span>
@@ -145,6 +146,7 @@ function onDragEnd() {
                 dragging: dragging === seatId(row, c),
                 dragover: dragOver === seatId(row, c),
                 'linked-hover': props.hoveredSeat === seatId(row, c),
+                'filter-match': !!props.filteredSeats?.has(seatId(row, c)),
               }"
               :disabled="!store.availableSeats.has(seatId(row, c))"
               :draggable="!!store.nameFor(seatId(row, c))"
@@ -317,6 +319,16 @@ function onDragEnd() {
   outline: 2px solid #0ea5e9;
   outline-offset: 1px;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);
+}
+/* Filter highlight: dim all seats, then pop the matches */
+.filter-active .seat:not(.filter-match) {
+  opacity: 0.25;
+}
+.seat.filter-match {
+  outline: 2px solid #a855f7;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.3);
+  opacity: 1 !important;
 }
 /* When a drag is in progress, empty available seats glow green as valid drop targets */
 .drag-active .seat:not(.occupied):not(.unavailable):not(.dragging) {

@@ -1,7 +1,7 @@
 {
   "name": "fly",
   "version": "1.0.0",
-  "description": "747 seat assignment viewer/editor",
+  "description": "A320-251N seat assignment viewer/editor",
   "type": "module",
   "scripts": {
     "dev": "vite",

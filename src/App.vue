@@ -32,6 +32,14 @@ const filteredRows = computed(() => {
   })
 })
 
+// Set of seat IDs that match the active filter — passed to SeatMap for highlighting.
+const filteredSeats = computed<Set<string> | null>(() => {
+  const query = searchQuery.value.toLowerCase().trim()
+  if (!query) return null
+  // Only include seats where the matched passenger is currently assigned (not empty seats).
+  return new Set(filteredRows.value.filter((r) => !!r.current).map((r) => r.seat))
+})
+
 const filteredHolding = computed(() => {
   const query = searchQuery.value.toLowerCase().trim()
   if (!query) return store.currentHolding
@@ -200,6 +208,7 @@ async function onFileChosen(e: Event) {
       <div class="plane-col">
         <SeatMap
           :hovered-seat="hoveredSeat"
+          :filtered-seats="filteredSeats"
           @select="selectSeat"
           @hover="setHoveredSeat"
         />

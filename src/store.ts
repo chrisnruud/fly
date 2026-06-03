@@ -125,20 +125,6 @@ export const useSeatStore = defineStore('seats', {
       const original = DEFAULT_ASSIGNMENTS[this.flight][seat] ?? ''
       return original !== (this.assignments[this.flight][seat] ?? '')
     },
-    assignSeat(seat: string, name: string) {
-      if (!this.isAvailable(seat)) return
-      const trimmed = name.trim()
-      if (trimmed) {
-        this.assignments[this.flight][seat] = trimmed
-      } else {
-        delete this.assignments[this.flight][seat]
-      }
-      this.dirty = true
-    },
-    clearSeat(seat: string) {
-      delete this.assignments[this.flight][seat]
-      this.dirty = true
-    },
     // Move a passenger to another seat; swaps if the target is taken.
     moveSeat(fromSeat: string, toSeat: string) {
       if (fromSeat === toSeat) return
@@ -192,7 +178,6 @@ export const useSeatStore = defineStore('seats', {
           'Kan ikke laste ned før alle passasjerer er plassert (venteområdet må være tomt).',
         )
       }
-      this.dirty = false
       return serializeAssignments(this.assignments)
     },
     // Replace current assignments from an uploaded txt file. Returns the number
@@ -203,6 +188,7 @@ export const useSeatStore = defineStore('seats', {
         Object.keys(parsed.outbound).length + Object.keys(parsed.return).length
       if (!count) throw new Error('Ingen seteplasseringer funnet i den opplastede filen.')
       this.assignments = clone(parsed)
+      this.holding = { outbound: [], return: [] }
       return count
     },
   },
